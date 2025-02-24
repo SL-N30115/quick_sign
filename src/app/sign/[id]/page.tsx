@@ -3,96 +3,77 @@
 import { useParams } from 'next/navigation';
 import { Document, Page, pdfjs } from 'react-pdf';
 import { Resizable } from 'react-resizable';
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useCallback } from 'react';
 import SignatureCanvas from 'react-signature-canvas';
-import Draggable, { DraggableData } from 'react-draggable';
+import Draggable from 'react-draggable';
 import 'react-pdf/dist/esm/Page/AnnotationLayer.css';
 import 'react-pdf/dist/esm/Page/TextLayer.css';
+import SignatureArea from "@/app/components/signatureArea";
 
+// 設定常數
+const CONFIG = {
+    API_BASE_URL: 'http://localhost:5000',
+    DEFAULT_PAGE_WIDTH: 800,
+    MIN_SIGNATURE_SIZE: [50, 25] as [number, number],
+    MAX_SIGNATURE_SIZE: [300, 150] as [number, number],
+    INITIAL_SIGNATURE_SIZE: { width: 100, height: 50 }
+};
+
+// 設定 PDF worker
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
     'pdfjs-dist/legacy/build/pdf.worker.min.mjs',
-    import.meta.url,
+    import.meta.url
 ).toString();
 
-interface Position {
-    x: number;
-    y: number;
-}
+// 介面定義
+interface Position { x: number; y: number }
+interface Size { width: number; height: number }
 
-interface Size {
-    width: number;
-    height: number;
-}
 
 export default function Sign() {
-    const params = useParams();
-    const id = params.id as string;
-    console.log('Document ID:', id);
-    const [numPages, setNumPages] = useState<number | null>(null);
+    const { id } = useParams();
+    const [numPages, setNumPages] = useState<number>(0);
     const [selectedPage, setSelectedPage] = useState<number>(1);
-    const sigCanvas = useRef<SignatureCanvas>(null);
     const [signatureImage, setSignatureImage] = useState<string | null>(null);
     const [position, setPosition] = useState<Position>({ x: 0, y: 0 });
-    const [size, setSize] = useState<Size>({ width: 100, height: 50 });
+    const [size, setSize] = useState<Size>(CONFIG.INITIAL_SIGNATURE_SIZE);
     const [pdfBlob, setPdfBlob] = useState<Blob | null>(null);
+    const [error, setError] = useState<string | null>(null);
+
+    const sigCanvas = useRef<SignatureCanvas>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
-    const fileUrl = `http://localhost:5000/file/${id}`;
-    console.log('Fetching PDF from:', fileUrl);
-
+    // 取得 PDF
     useEffect(() => {
-        let mounted = true;
         const fetchPdf = async () => {
             try {
-                const response = await fetch(fileUrl);
+                const response = await fetch(`${CONFIG.API_BASE_URL}/file/${id}`);
                 if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
                 const blob = await response.blob();
-                if (mounted) {
-                    setPdfBlob(blob);
-                    console.log('PDF Blob set:', blob);
-                }
+                setPdfBlob(blob);
             } catch (error) {
+                setError('無法載入 PDF 文件');
                 console.error('Fetch error:', error);
             }
         };
-        fetchPdf();
-        return () => {
-            mounted = false;
-        };
-    }, [fileUrl]);
 
-    useEffect(() => {
-        if (canvasRef.current) {
-            console.log('Canvas element created:', canvasRef.current);
-        } else {
-            console.log('Canvas ref is null');
-        }
-    }, [pdfBlob]);
+        if (id) fetchPdf();
+    }, [id]);
 
-    const handleDrag = (e: any, data: DraggableData) => {
-        setPosition({ x: data.x, y: data.y });
-    };
-
-    const handleResize = (e: any, { size }: { size: Size }) => {
-        setSize(size);
-    };
-
-    const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
-        setNumPages(numPages);
-        console.log('PDF loaded with', numPages, 'pages');
-    };
-
-    const saveSignature = () => {
+    // 處理簽名
+    const handleSaveSignature = useCallback(() => {
         if (sigCanvas.current) {
             const image = sigCanvas.current.getTrimmedCanvas().toDataURL('image/png');
             setSignatureImage(image);
         }
-    };
+    }, []);
 
+    // 處理最終提交
     const handleFinalize = async () => {
         if (!signatureImage || !id) return;
+
         try {
-            const response = await fetch('http://localhost:5000/sign', {
+            const response = await fetch(`${CONFIG.API_BASE_URL}/sign`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -100,108 +81,79 @@ export default function Sign() {
                     signatureImage,
                     page: selectedPage,
                     position,
-                    size,
-                }),
+                    size
+                })
             });
-            const data: { signedId: string } = await response.json();
-            window.location.href = `/download/${data.signedId}`;
+
+            const data = await response.json();
+            if (data.signedId) {
+                window.location.href = `/download/${data.signedId}`;
+            }
         } catch (error) {
+            setError('簽名提交失敗');
             console.error('Error finalizing signature:', error);
         }
     };
 
-    if (!id) return <p>No document ID provided</p>;
-    if (!pdfBlob) return <div>Fetching PDF...</div>;
-
-    console.log('Rendering Document with file:', pdfBlob);
+    if (error) return <div className="text-red-500">{error}</div>;
+    if (!id) return <div>未提供文件 ID</div>;
+    if (!pdfBlob) return <div>載入中...</div>;
 
     return (
         <div className="container mx-auto p-4">
-            <h1 className="text-2xl font-bold mb-4">Sign Document</h1>
-            <div className="mb-4">
-                <select
-                    value={selectedPage}
-                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
-                        setSelectedPage(parseInt(e.target.value))
-                    }
-                    className="border p-2 rounded"
-                >
-                    {numPages
-                        ? Array.from({ length: numPages }, (_, i) => (
-                            <option key={i + 1} value={i + 1}>
-                                Page {i + 1}
-                            </option>
-                        ))
-                        : <option>Loading pages...</option>}
-                </select>
-            </div>
+            <h1 className="text-2xl font-bold mb-4">簽署文件</h1>
 
-            <div className="mb-4" style={{ position: 'relative', width: '100%', height: 'auto', border: '1px solid red', minHeight: '500px', backgroundColor: '#fff' }}>
+            {/* 頁面選擇器 */}
+            <select
+                value={selectedPage}
+                onChange={(e) => setSelectedPage(Number(e.target.value))}
+                className="border p-2 rounded mb-4"
+            >
+                {Array.from({ length: numPages }, (_, i) => (
+                    <option key={i + 1} value={i + 1}>第 {i + 1} 頁</option>
+                ))}
+            </select>
+
+            {/* PDF 顯示區域 */}
+            <div className="relative mb-4 border min-h-[500px] bg-white">
                 <Document
-                    key={pdfBlob.size + pdfBlob.type}
                     file={pdfBlob}
-                    onLoadSuccess={onDocumentLoadSuccess}
-                    onLoadError={(error) => console.error('PDF load error:', error)}
-                    onSourceSuccess={() => console.log('PDF source loaded successfully')}
-                    onSourceError={(error) => console.error('PDF source error:', error)}
-                    loading={<div>Loading PDF...</div>}
-                    error={<div>Failed to load PDF</div>}
-                    className="border p-4"
+                    onLoadSuccess={({ numPages }) => setNumPages(numPages)}
+                    loading={<div>載入 PDF 中...</div>}
+                    error={<div>PDF 載入失敗</div>}
                 >
                     <Page
-                        pageNumber={1}
-                        renderTextLayer={true}
-                        renderAnnotationLayer={true}
-                        width={800}
+                        pageNumber={selectedPage}
+                        width={CONFIG.DEFAULT_PAGE_WIDTH}
                         canvasRef={canvasRef}
-                        onRenderSuccess={() => console.log('Page rendered successfully')}
-                        onRenderError={(error) => console.error('Page render error:', error)}
-                        onLoadSuccess={() => console.log('Page loaded successfully')}
                     />
                 </Document>
             </div>
 
-            <div className="mb-4 border p-4">
-                <SignatureCanvas
-                    ref={sigCanvas}
-                    canvasProps={{
-                        width: 500,
-                        height: 200,
-                        className: 'border',
-                    }}
-                />
-                <div className="mt-2">
-                    <button
-                        onClick={saveSignature}
-                        className="bg-blue-500 text-white px-4 py-2 rounded mr-2"
-                    >
-                        Save Signature
-                    </button>
-                    <button
-                        onClick={() => sigCanvas.current?.clear()}
-                        className="bg-gray-500 text-white px-4 py-2 rounded"
-                    >
-                        Clear
-                    </button>
-                </div>
-            </div>
+            {/* 簽名區域 */}
+            <SignatureArea
+                sigCanvas={sigCanvas}
+                onSave={handleSaveSignature}
+                onClear={() => sigCanvas.current?.clear()}
+            />
 
+            {/* 簽名預覽 */}
             {signatureImage && (
-                <Draggable position={position} onStop={handleDrag}>
+                <Draggable position={position} onStop={(_, data) => setPosition({ x: data.x, y: data.y })}>
                     <Resizable
                         width={size.width}
                         height={size.height}
-                        onResize={handleResize}
-                        minConstraints={[50, 25]}
-                        maxConstraints={[300, 150]}
+                        onResize={(_, { size }) => setSize(size)}
+                        minConstraints={CONFIG.MIN_SIGNATURE_SIZE}
+                        maxConstraints={CONFIG.MAX_SIGNATURE_SIZE}
                     >
                         <img
                             src={signatureImage}
-                            alt="Signature"
+                            alt="簽名"
                             style={{
                                 width: size.width,
                                 height: size.height,
-                                cursor: 'move',
+                                cursor: 'move'
                             }}
                             className="border border-dashed border-gray-400"
                         />
@@ -209,6 +161,7 @@ export default function Sign() {
                 </Draggable>
             )}
 
+            {/* 確認按鈕 */}
             <button
                 onClick={handleFinalize}
                 disabled={!signatureImage}
@@ -218,7 +171,7 @@ export default function Sign() {
                         : 'bg-gray-300 cursor-not-allowed'
                 }`}
             >
-                Finalize
+                確認送出
             </button>
         </div>
     );
