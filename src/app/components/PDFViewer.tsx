@@ -1,145 +1,156 @@
-// components/PDFViewer.tsx
 'use client';
 
-import {Document, Page, pdfjs} from 'react-pdf';
 import React, {useState, useEffect, useRef} from 'react';
-import 'react-pdf/dist/esm/Page/AnnotationLayer.css';
-import 'react-pdf/dist/esm/Page/TextLayer.css';
+import {useInView} from 'react-intersection-observer';
+import {pdfjs} from 'react-pdf';
 
-pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-    'pdfjs-dist/legacy/build/pdf.worker.min.mjs',
-    import.meta.url
-).toString();
+pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
 
 interface PDFViewerProps {
     pdfBlob: Blob;
     selectedPage: number;
     onPageChange: (pageNumber: number) => void;
-    className?: string;
 }
 
-const PDFViewer: React.FC<PDFViewerProps> = ({
-                                                 pdfBlob,
-                                                 selectedPage,
-                                                 onPageChange,
-                                                 className
-                                             }) => {
-    const [numPages, setNumPages] = useState<number>(0);
-    const [scale, setScale] = useState(1);
-    const [pageWidth, setPageWidth] = useState(800); // Default width
+const PDFViewer: React.FC<PDFViewerProps> = ({pdfBlob, selectedPage, onPageChange}) => {
+    const [numPages, setNumPages] = useState(0);
+    const [pdfDocument, setPdfDocument] = useState<pdfjs.PDFDocumentProxy | null>(null);
+    const [scale, setScale] = useState(1.5); // Initial scale
     const containerRef = useRef<HTMLDivElement>(null);
+    const [containerWidth, setContainerWidth] = useState(0); // Track container width
 
-    const handleZoomIn = () => setScale(prev => Math.min(prev + 0.2, 2));
-    const handleZoomOut = () => setScale(prev => Math.max(prev - 0.2, 0.5));
-    const handleZoomFit = () => {
-        if (containerRef.current) {
-            const newWidth = containerRef.current.offsetWidth - 48;
-            setPageWidth(newWidth);
-            setScale(1);
-        }
-    };
-
+    // Load PDF document
     useEffect(() => {
-        handleZoomFit();
-        window.addEventListener('resize', handleZoomFit);
-        return () => window.removeEventListener('resize', handleZoomFit);
+        const loadPDF = async () => {
+            const arrayBuffer = await pdfBlob.arrayBuffer();
+            const pdf = await pdfjs.getDocument({data: arrayBuffer}).promise;
+            setPdfDocument(pdf);
+            setNumPages(pdf.numPages);
+        };
+        loadPDF();
+    }, [pdfBlob]);
+
+    // Get container width on mount and resize
+    useEffect(() => {
+        const handleResize = () => {
+            setContainerWidth(containerRef.current ? containerRef.current.offsetWidth : 0);
+        };
+
+        handleResize(); // Initial measurement
+        window.addEventListener('resize', handleResize);
+
+        return () => window.removeEventListener('resize', handleResize);
     }, []);
 
-    return (
-        <div className={className}>
-            {/* Controls */}
-            <div className="flex items-center justify-between mb-4 bg-white p-4 rounded-lg shadow">
-                {/* Page Navigation */}
-                <div className="flex items-center space-x-2">
-                    <button
-                        onClick={() => onPageChange(Math.max(selectedPage - 1, 1))}
-                        disabled={selectedPage === 1}
-                        className="px-3 py-1 bg-gray-100 rounded-md hover:bg-gray-200 disabled:opacity-50
-                                 disabled:cursor-not-allowed transition-colors"
-                    >
-                        Previous
-                    </button>
-                    <select
-                        value={selectedPage}
-                        onChange={(e) => onPageChange(Number(e.target.value))}
-                        className="border border-gray-200 px-2 py-1 rounded-md focus:outline-none
-                                 focus:ring-2 focus:ring-blue-500"
-                    >
-                        {Array.from({length: numPages}, (_, i) => (
-                            <option key={i + 1} value={i + 1}>
-                                Page {i + 1} of {numPages}
-                            </option>
-                        ))}
-                    </select>
-                    <button
-                        onClick={() => onPageChange(Math.min(selectedPage + 1, numPages))}
-                        disabled={selectedPage === numPages}
-                        className="px-3 py-1 bg-gray-100 rounded-md hover:bg-gray-200 disabled:opacity-50
-                                 disabled:cursor-not-allowed transition-colors"
-                    >
-                        Next
-                    </button>
-                </div>
+    const PDFPageImage = ({pageNumber}: { pageNumber: number }) => {
+        const [imageUrl, setImageUrl] = useState<string | null>(null);
+        const {ref, inView} = useInView({
+            threshold: 0,
+            triggerOnce: false,
+            rootMargin: '200px 0px',
+        });
 
-                {/* Zoom Controls */}
-                <div className="flex items-center space-x-2">
-                    <button
-                        onClick={handleZoomOut}
-                        className="p-2 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors"
-                    >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4"/>
-                        </svg>
-                    </button>
-                    <span className="text-sm font-medium">{Math.round(scale * 100)}%</span>
+        useEffect(() => {
+            const renderPage = async () => {
+                if (!inView || !pdfDocument) return;
+
+                try {
+                    const page = await pdfDocument.getPage(pageNumber);
+                    const viewport = page.getViewport({scale});
+
+                    // Create canvas
+                    const canvas = document.createElement('canvas');
+                    const context = canvas.getContext('2d');
+                    canvas.width = viewport.width;
+                    canvas.height = viewport.height;
+
+                    if (!context) return;
+
+                    // Render PDF page to canvas
+                    await page.render({
+                        canvasContext: context,
+                        viewport: viewport,
+                    }).promise;
+
+                    // Convert canvas to blob URL
+                    const blob = await new Promise<Blob>((resolve) => {
+                        canvas.toBlob((blob) => {
+                            if (blob) resolve(blob);
+                        }, 'image/png');
+                    });
+
+                    const url = URL.createObjectURL(blob);
+                    setImageUrl(url);
+
+                    // Cleanup
+                    return () => URL.revokeObjectURL(url);
+                } catch (error) {
+                    console.error('Error rendering page:', error);
+                }
+            };
+
+            renderPage();
+        }, [inView, pageNumber, pdfDocument, scale]);
+
+        return (
+            <div
+                ref={ref}
+                className="flex justify-center mb-4"
+                data-page-number={pageNumber}
+            >
+                {imageUrl ? (
+                    <img
+                        src={imageUrl}
+                        alt={`Page ${pageNumber}`}
+                        className="shadow-lg rounded-lg"
+                        loading="lazy"
+                        style={{maxWidth: '100%', height: 'auto'}} // Ensure image fits container
+                    />
+                ) : (
+                    <div className="w-full h-[800px] bg-gray-100 animate-pulse rounded-lg"/>
+                )}
+            </div>
+        );
+    };
+
+    const handleZoomIn = () => {
+        setScale(s => Math.min(s + 0.2, 3));
+    };
+
+    const handleZoomOut = () => {
+        setScale(s => Math.max(s - 0.2, 0.5));
+    };
+
+    return (
+        <div className="flex flex-col h-full">
+            {/* Toolbar */}
+            <div className="bg-gray-50 p-4 shadow-md flex justify-between items-center">
+                <div className="font-semibold">PDF Viewer</div>
+                <div className="flex gap-2">
                     <button
                         onClick={handleZoomIn}
-                        className="p-2 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors"
+                        className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
                     >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4"/>
-                        </svg>
+                        Zoom In
                     </button>
                     <button
-                        onClick={handleZoomFit}
-                        className="px-3 py-1 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors"
+                        onClick={handleZoomOut}
+                        className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
                     >
-                        Fit
+                        Zoom Out
                     </button>
                 </div>
             </div>
 
-            {/* PDF Viewer */}
-            <div
-                ref={containerRef}
-                className="relative bg-gray-50 rounded-lg shadow-lg overflow-auto"
-                style={{height: 'calc(100vh - 250px)'}}
-            >
-                <Document
-                    file={pdfBlob}
-                    onLoadSuccess={({numPages}) => setNumPages(numPages)}
-                    loading={
-                        <div className="flex items-center justify-center h-full">
-                            <div className="animate-spin rounded-full h-12 w-12 border-4 border-gray-200
-                                          border-t-blue-500"/>
-                        </div>
-                    }
-                    error={
-                        <div className="flex items-center justify-center h-full text-red-500">
-                            Failed to load PDF
-                        </div>
-                    }
-                >
-                    <div className="p-6">
-                        <Page
-                            pageNumber={selectedPage}
-                            width={pageWidth * scale}
-                            className="shadow-lg mx-auto"
-                            renderAnnotationLayer={false}
-                            renderTextLayer={true}
-                        />
-                    </div>
-                </Document>
+            {/* PDF Pages */}
+            <div ref={containerRef} className="flex-1 overflow-auto p-4">
+                {numPages > 0 ? (
+                    Array.from({length: numPages}, (_, i) => (
+                        <PDFPageImage key={i + 1} pageNumber={i + 1}/>
+                    ))
+                ) : (
+                    <div className="text-center">Loading PDF...</div>
+                )}
             </div>
         </div>
     );
