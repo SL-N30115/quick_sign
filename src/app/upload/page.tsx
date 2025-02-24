@@ -6,7 +6,7 @@ import * as pdfjs from 'pdfjs-dist';
 pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js';
 
 export default function Upload() {
-    const router = useRouter();  // 使用 hook
+    const router = useRouter();
     const [file, setFile] = useState<File | null>(null);
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -27,7 +27,7 @@ export default function Upload() {
                 body: formData,
             });
             const data: { id: string } = await response.json();
-            router.push(`/sign/${data.id}`);  // 使用 router 實例
+            router.push(`/sign/${data.id}`);
         } catch (error) {
             console.error('Upload failed:', error);
         }
@@ -46,7 +46,7 @@ export default function Upload() {
                 <button
                     type="submit"
                     className="bg-blue-500 text-white px-4 py-2 rounded"
-                    disabled={!file}  // 添加禁用狀態
+                    disabled={!file}
                 >
                     Upload
                 </button>
