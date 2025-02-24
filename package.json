@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@types/react-router": "^5.1.20",
+    "lodash": "^4.17.21",
     "next": "15.1.7",
     "pdfjs-dist": "^4.8.69",
     "react": "^19.0.0",
@@ -22,6 +23,7 @@
     "signature_pad": "^5.0.4"
   },
   "devDependencies": {
+    "@types/lodash": "^4.17.15",
     "@types/node": "^20",
     "@types/pdfjs-dist": "^2.10.377",
     "@types/react": "^19",
