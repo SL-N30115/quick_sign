@@ -10,6 +10,7 @@ import 'react-pdf/dist/esm/Page/AnnotationLayer.css';
 import 'react-pdf/dist/esm/Page/TextLayer.css';
 import SignatureArea from "@/app/components/signatureArea";
 import SignaturePad from "signature_pad";
+import PDFViewer from "@/app/components/PDFViewer";
 
 
 const CONFIG = {
@@ -71,7 +72,6 @@ export default function Sign() {
     const handleSave = () => {
         if (signaturePadRef.current && !signaturePadRef.current.isEmpty()) {
             const dataUrl = signaturePadRef.current.toDataURL('image/png');
-            // 處理簽名圖片
             console.log(dataUrl);
         }
     };
@@ -117,31 +117,14 @@ export default function Sign() {
         <div className="container mx-auto p-4">
             <h1 className="text-2xl font-bold mb-4">Sign Document</h1>
 
-            <select
-                value={selectedPage}
-                onChange={(e) => setSelectedPage(Number(e.target.value))}
-                className="border p-2 rounded mb-4"
-            >
-                {Array.from({length: numPages}, (_, i) => (
-                    <option key={i + 1} value={i + 1}>第 {i + 1} 頁</option>
-                ))}
-            </select>
+            {/*PDF Viewer*/}
+            <PDFViewer pdfBlob={pdfBlob}
+                       selectedPage={selectedPage}
+                       onPageChange={setSelectedPage}
+                       className={"mb-4"}
+            />
 
-            <div className="relative mb-4 border min-h-[500px] bg-white">
-                <Document
-                    file={pdfBlob}
-                    onLoadSuccess={({numPages}) => setNumPages(numPages)}
-                    loading={<div>Loading PDF...</div>}
-                    error={<div>PDF Load failed</div>}
-                >
-                    <Page
-                        pageNumber={selectedPage}
-                        width={CONFIG.DEFAULT_PAGE_WIDTH}
-                        canvasRef={canvasRef}
-                    />
-                </Document>
-            </div>
-
+            {/*Signature Area*/}
             <SignatureArea
                 signaturePadRef={signaturePadRef}
                 canvasRef={canvasRef}
@@ -155,7 +138,7 @@ export default function Sign() {
                         position={position}
                         onStop={(_, data) => setPosition({x: data.x, y: data.y})}
                     >
-                        <div> {/* 添加一個包裝 div */}
+                        <div>
                             <Resizable
                                 width={size.width}
                                 height={size.height}
