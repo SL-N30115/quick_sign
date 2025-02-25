@@ -40,13 +40,16 @@ export default function Sign() {
     const [error, setError] = useState<string | null>(null);
     const signaturePadRef = useRef<SignaturePad | null>(null);
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
+    const [isProcessingSignature, setIsProcessingSignature] = useState<boolean>(false);
     
     // Use the same structure as expected by PDFViewer
     const [signatures, setSignatures] = useState<SignaturePosition[]>([]);
 
     // Handle signature save from SignatureArea component
-    const handleSignatureSave = (signatureDataUrl: string) => {
+    const handleSignatureSave = async (signatureDataUrl: string) => {
+        setIsProcessingSignature(true);
         setSignatureImage(signatureDataUrl);
+        setIsProcessingSignature(false);
     };
 
     // Save signature positions from PDFViewer
@@ -155,6 +158,19 @@ export default function Sign() {
                         onClear={handleClear}
                     />
                     
+                    {signatureImage && (
+                        <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+                            <h3 className="font-medium mb-2">Your Signature</h3>
+                            <div className="border rounded p-2 flex justify-center">
+                                <img 
+                                    src={signatureImage} 
+                                    alt="Your signature" 
+                                    className="max-h-24"
+                                />
+                            </div>
+                        </div>
+                    )}
+                    
                     {signatures.length > 0 && signatureImage && (
                         <button 
                             onClick={handleFinalize}
@@ -179,5 +195,5 @@ export default function Sign() {
                 </div>
             </div>
         </div>
-    );
+    )
 }
