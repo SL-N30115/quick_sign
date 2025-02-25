@@ -1,28 +1,20 @@
 'use client'
-import React, {useEffect} from "react";
+import React, { useEffect } from "react";
 import SignaturePad from "signature_pad";
 
 interface SignatureAreaProps {
     signaturePadRef: React.RefObject<SignaturePad | null>;
     canvasRef: React.RefObject<HTMLCanvasElement | null>;
-    onSignatureSave: (signatureDataUrl: string) => void;
+    onSave: () => void;
     onClear: () => void;
 }
 
 const SignatureArea: React.FC<SignatureAreaProps> = ({
                                                          signaturePadRef,
                                                          canvasRef,
-                                                         onSignatureSave,
+                                                         onSave,
                                                          onClear
                                                      }) => {
-
-    const handleSave = () => {
-        if (signaturePadRef.current && !signaturePadRef.current.isEmpty()) {
-            const dataUrl = signaturePadRef.current.toDataURL('image/png');
-            onSignatureSave(dataUrl);
-        }
-    };
-
     useEffect(() => {
         // Ensure canvas element exists
         const canvas = canvasRef.current;
@@ -71,18 +63,18 @@ const SignatureArea: React.FC<SignatureAreaProps> = ({
         <div className="mb-4 p-4 bg-white rounded-lg shadow-md">
             <div
                 className="w-full border border-gray-300 rounded-lg overflow-hidden"
-                style={{touchAction: 'none'}}
+                style={{ touchAction: 'none' }}
             >
                 <canvas
                     ref={canvasRef}
                     className="w-full h-[200px] cursor-crosshair"
-                    style={{touchAction: 'none'}}
+                    style={{ touchAction: 'none' }}
                 />
             </div>
 
             <div className="mt-4 flex gap-2">
                 <button
-                    onClick={handleSave}
+                    onClick={onSave}
                     className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600
                              transition-colors duration-200 focus:outline-none focus:ring-2
                              focus:ring-blue-500 focus:ring-offset-2"
