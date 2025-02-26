@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useInView } from "react-intersection-observer";
 import { pdfjs } from "react-pdf";
 import debounce from "lodash/debounce";
@@ -95,12 +95,21 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
   };
 
   // Function to update signatures - passed to DraggableSignature component
-  const updateSignatures = (updatedSignatures: SignaturePosition[]) => {
+  const updateSignatures = useCallback((updatedSignatures: SignaturePosition[]) => {
+    // First update local state
     setSignatures(updatedSignatures);
-    if (saveSignaturePositions) {
-      saveSignaturePositions(updatedSignatures);
+    
+    // Then use useEffect to handle parent state updates
+  }, []);
+  
+  // Add this useEffect to handle parent updates separately
+  useEffect(() => {
+    // Only call saveSignaturePositions when signatures change
+    // and not during the initial render
+    if (signatures.length > 0 && saveSignaturePositions) {
+      saveSignaturePositions(signatures);
     }
-  };
+  }, [signatures, saveSignaturePositions]);
 
   // Function to remove a signature - passed to DraggableSignature component
   const removeSignature = (id: string) => {

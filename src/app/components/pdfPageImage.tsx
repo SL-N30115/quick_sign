@@ -149,22 +149,22 @@ const PDFPageImage: React.FC<PDFPageImageProps> = ({
           />
 
           {/* Render signatures for this page */}
-          {signatureImage &&
-            signatures
-              .filter((sig) => sig.pageNumber === pageNumber)
-              .map((signature) => (
-                <DraggableSignature
-                  key={signature.id}
-                  signature={signature}
-                  signatureImage={signatureImage}
-                  activeSignatureId={activeSignatureId}
-                  setActiveSignatureId={setActiveSignatureId}
-                  pageDimensions={pageDimensions}
-                  updateSignatures={updateSignatures}
-                  allSignatures={signatures}
-                  removeSignature={removeSignature}
-                />
-              ))}
+          {signatureImage && pageDimensions.has(pageNumber) &&
+        signatures
+          .filter((sig) => sig.pageNumber === pageNumber)
+          .map((signature) => (
+            <DraggableSignature
+              key={signature.id}
+              signature={signature}
+              signatureImage={signatureImage}
+              activeSignatureId={activeSignatureId}
+              setActiveSignatureId={setActiveSignatureId}
+              pageDimensions={pageDimensions}
+              updateSignatures={updateSignatures}
+              allSignatures={signatures}
+              removeSignature={removeSignature}
+            />
+          ))}
         </div>
       )}
     </div>

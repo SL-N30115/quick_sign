@@ -53,12 +53,13 @@ const DraggableSignature: React.FC<DraggableSignatureProps> = ({
   }, [signature.x, signature.y, signature.width, signature.height]);
 
   // Memoized update function to reduce state updates
-  const updateSignatureInParent = useRef(
+  const updateSignatureInParent = useCallback(
     debounce(() => {
       // Get current page dimensions
       const dimensions = pageDimensions.get(signature.pageNumber);
+      if (!dimensions) return; // Don't update if dimensions aren't available
       
-      // Update signature position in parent state
+      // Create a new array only if there's an actual change
       const updatedSignatures = allSignatures.map((sig) =>
         sig.id === signature.id ? {
           ...sig,
@@ -66,17 +67,17 @@ const DraggableSignature: React.FC<DraggableSignatureProps> = ({
           y: positionRef.current.y,
           width: sizeRef.current.width,
           height: sizeRef.current.height,
-          // Update with current page dimensions
-          pageWidth: dimensions?.width,
-          pageHeight: dimensions?.height,
-          pdfWidth: dimensions?.pdfWidth,
-          pdfHeight: dimensions?.pdfHeight
+          pageWidth: dimensions.width,
+          pageHeight: dimensions.height,
+          pdfWidth: dimensions.pdfWidth,
+          pdfHeight: dimensions.pdfHeight
         } : sig
       );
       
       updateSignatures(updatedSignatures);
-    }, 100)
-  ).current;
+    }, 100),
+    [signature.id, signature.pageNumber, pageDimensions, allSignatures, updateSignatures]
+  );
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     setIsDragging(true);
@@ -85,7 +86,10 @@ const DraggableSignature: React.FC<DraggableSignatureProps> = ({
       y: e.clientY - position.y,
     });
     setActiveSignatureId(signature.id);
+    
+    // Stop event propagation to prevent parent handlers from firing
     e.stopPropagation();
+    e.preventDefault(); // Add this to prevent any default browser actions
   }, [position.x, position.y, setActiveSignatureId, signature.id]);
 
   const handleMouseMove = useCallback((e: MouseEvent) => {
@@ -110,16 +114,19 @@ const DraggableSignature: React.FC<DraggableSignatureProps> = ({
     // Final update to visual state
     setPosition(positionRef.current);
     
-    // Inform parent component of the change
+    // Make sure to call this to update the parent component with the final position
     updateSignatureInParent();
   }, [isDragging, updateSignatureInParent]);
 
   // Resize handlers
   const handleResizeStart = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation();
     setIsResizing(true);
     setResizeStartPos({ x: e.clientX, y: e.clientY });
     setActiveSignatureId(signature.id);
+    
+    // Stop event propagation to prevent parent handlers from firing
+    e.stopPropagation();
+    e.preventDefault(); // Add this to prevent any default browser actions
   }, [setActiveSignatureId, signature.id]);
 
   const handleResizeMove = useCallback((e: MouseEvent) => {
@@ -143,16 +150,16 @@ const DraggableSignature: React.FC<DraggableSignatureProps> = ({
     e.preventDefault();
   }, [isResizing, resizeStartPos.x, resizeStartPos.y, size.width, size.height]);
 
-  const handleResizeEnd = useCallback(() => {
-    if (!isResizing) return;
-    setIsResizing(false);
-    
-    // Final update to visual state
-    setSize(sizeRef.current);
-    
-    // Inform parent component of the change
-    updateSignatureInParent();
-  }, [isResizing, updateSignatureInParent]);
+ const handleResizeEnd = useCallback(() => {
+  if (!isResizing) return;
+  setIsResizing(false);
+  
+  // Update size state with the final values
+  setSize(sizeRef.current);
+  
+  // Make sure to call this to update the parent component
+  updateSignatureInParent();
+}, [isResizing, updateSignatureInParent]);
 
   useEffect(() => {
     if (isDragging) {
