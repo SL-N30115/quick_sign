@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useInView } from "react-intersection-observer";
 import { pdfjs } from "react-pdf";
 import debounce from "lodash/debounce";
 import DraggableSignature from "./DraggableSignature";
 import { SignaturePosition } from "@/app/types/signaturePosition";
 import PDFPageImage from "@/app/components/pdfPageImage";
+import PDFSidebar from "./PDFSidebar";
 
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
   "pdfjs-dist/legacy/build/pdf.worker.min.mjs",
@@ -22,6 +23,9 @@ interface PDFViewerProps {
 }
 
 const imageCache = new Map<string, string>();
+
+// Number of pages to preload before and after the current page
+const PRE_LOAD_PAGES = 40;
 
 const PDFViewer: React.FC<PDFViewerProps> = ({
   pdfBlob,
@@ -45,6 +49,9 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
     null
   );
 
+  // Keep track of rendered pages
+  const [renderedPages, setRenderedPages] = useState<Set<number>>(new Set([selectedPage]));
+
   const [pageDimensions, setPageDimensions] = useState<Map<number, { 
     width: number, 
     height: number, 
@@ -52,42 +59,74 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
     pdfHeight: number 
   }>>(new Map());
 
+  // Pre-render surrounding pages when selectedPage changes
+  useEffect(() => {
+    if (numPages === 0) return;
+    
+    // Add current page to rendered pages
+    setRenderedPages(prev => {
+      const newSet = new Set(prev);
+      newSet.add(selectedPage);
+      
+      // Add pages around the current page
+      for (let i = 1; i <= PRE_LOAD_PAGES; i++) {
+        if (selectedPage + i <= numPages) {
+          newSet.add(selectedPage + i);
+        }
+        if (selectedPage - i >= 1) {
+          newSet.add(selectedPage - i);
+        }
+      }
+      
+      return newSet;
+    });
+  }, [selectedPage, numPages]);
+
   const handlePageClick = (e: React.MouseEvent, pageNumber: number) => {
     if (!signatureImage) return;
-
+  
+    // IMPORTANT: Always use the selectedPage instead of pageNumber parameter
+    // This ensures signatures are placed on the visible page regardless of which page element was clicked
+    const actualPageNumber = selectedPage;
+    console.log(`Adding signature to page ${actualPageNumber} (clicked on element with page ${pageNumber})`);
     // Call the parent's onClick handler if provided
     if (onPageClick) {
-      onPageClick(e, pageNumber);
+      onPageClick(e, actualPageNumber);
     }
-
+  
     const rect = (e.target as HTMLElement).getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
-
-    // Get page dimensions for scaling information
-    const dimensions = pageDimensions.get(pageNumber);
-
+  
+    // Get page dimensions for the SELECTED page (not the clicked page)
+    const dimensions = pageDimensions.get(actualPageNumber);
+    
+    if (!dimensions) {
+      console.error(`No dimensions found for page ${actualPageNumber}`);
+      return;
+    }
+  
     // Default signature size
     const width = 150;
     const height = 80;
-
+  
     const newSignature: SignaturePosition = {
       id: `sig-${Date.now()}`,
-      pageNumber,
+      pageNumber: actualPageNumber,  // Use the selected page number
       x,
       y,
       width,
       height,
       // Add dimension information for coordinate conversion
-      pageWidth: dimensions?.width,
-      pageHeight: dimensions?.height,
-      pdfWidth: dimensions?.pdfWidth,
-      pdfHeight: dimensions?.pdfHeight
+      pageWidth: dimensions.width,
+      pageHeight: dimensions.height,
+      pdfWidth: dimensions.pdfWidth,
+      pdfHeight: dimensions.pdfHeight
     };
-
+  
     const updatedSignatures = [...signatures, newSignature];
     setSignatures(updatedSignatures);
-
+  
     // Save signatures if handler provided
     if (saveSignaturePositions) {
       saveSignaturePositions(updatedSignatures);
@@ -98,8 +137,6 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
   const updateSignatures = useCallback((updatedSignatures: SignaturePosition[]) => {
     // First update local state
     setSignatures(updatedSignatures);
-    
-    // Then use useEffect to handle parent state updates
   }, []);
   
   // Add this useEffect to handle parent updates separately
@@ -171,6 +208,49 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
     imageCache.clear();
   };
 
+  // Pre-render all pages but only show the current one
+  // This uses CSS to hide/show pages instead of unmounting/remounting them
+  const pageComponents = useMemo(() => {
+    if (!numPages) return [];
+    
+    return Array.from(renderedPages).map(pageNum => (
+      <div 
+        key={pageNum} 
+        className={`pdf-page-wrapper transition-opacity duration-150 ${
+          pageNum === selectedPage ? 'opacity-100 z-10' : 'opacity-0 absolute top-0 left-0 z-0'
+        }`}
+      >
+        <PDFPageImage
+          key={`page-${pageNum}-scale-${scale}`}
+          pageNumber={pageNum}
+          pdfDocument={pdfDocument}
+          scale={scale}
+          containerWidth={containerWidth}
+          signatureImage={signatureImage ?? null}
+          signatures={signatures}
+          pageDimensions={pageDimensions}
+          setPageDimensions={setPageDimensions}
+          handlePageClick={handlePageClick}
+          updateSignatures={updateSignatures}
+          removeSignature={removeSignature}
+          activeSignatureId={activeSignatureId}
+          setActiveSignatureId={setActiveSignatureId}
+        />
+      </div>
+    ));
+  }, [
+    numPages, 
+    renderedPages, 
+    selectedPage, 
+    pdfDocument, 
+    scale, 
+    containerWidth, 
+    signatureImage, 
+    signatures,
+    pageDimensions,
+    activeSignatureId
+  ]);
+
   return (
     <div className="flex flex-col h-full">
       <div className="bg-gray-50 p-4 shadow-md flex justify-between items-center sticky top-0 z-10">
@@ -190,33 +270,33 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
           </button>
         </div>
       </div>
-
-      <div ref={containerRef} className="flex-1 overflow-auto p-4 bg-gray-100">
-        {numPages > 0 ? (
-          Array.from({ length: numPages }, (_, i) => (
-            <PDFPageImage
-              key={i + 1}
-              pageNumber={i + 1}
-              pdfDocument={pdfDocument}
-              scale={scale}
-              containerWidth={containerWidth}
-              signatureImage={signatureImage ?? null}
-              signatures={signatures}
-              pageDimensions={pageDimensions}
-              setPageDimensions={setPageDimensions}
-              handlePageClick={handlePageClick}
-              updateSignatures={updateSignatures}
-              removeSignature={removeSignature}
-              activeSignatureId={activeSignatureId}
-              setActiveSignatureId={setActiveSignatureId}
-            />
-          ))
-        ) : (
-          <div className="text-center py-8">
-            <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-blue-500 border-r-transparent"></div>
-            <p className="mt-2">Loading pdf...</p>
-          </div>
-        )}
+  
+      <div className="flex flex-1 overflow-hidden">
+        {/* Sidebar */}
+        <div className="w-48 border-r border-gray-200 h-full">
+          <PDFSidebar
+            pdfDocument={pdfDocument}
+            currentPage={selectedPage}
+            onPageSelect={(page) => {
+              onPageChange(page);
+            }}
+            numPages={numPages}
+          />
+        </div>
+  
+        {/* Main PDF content - Only show current selected page */}
+        <div ref={containerRef} className="flex-1 overflow-auto p-4 bg-gray-100 flex justify-center relative">
+          {numPages > 0 ? (
+            <div className="pdf-page-container relative">
+              {pageComponents}
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-blue-500 border-r-transparent"></div>
+              <p className="mt-2">Loading pdf...</p>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
