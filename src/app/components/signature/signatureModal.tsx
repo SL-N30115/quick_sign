@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import SignatureArea from "../signatureArea";
+import SignaturePad from "signature_pad";
 
 interface SignatureModalProps {
   isOpen: boolean;
