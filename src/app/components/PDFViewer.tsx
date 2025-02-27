@@ -1,4 +1,10 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  useMemo,
+} from "react";
 import { pdfjs } from "react-pdf";
 import debounce from "lodash/debounce";
 import { SignaturePosition } from "@/app/types/signaturePosition";
@@ -30,39 +36,51 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
   saveSignaturePositions,
 }) => {
   const [numPages, setNumPages] = useState(0);
-  const [pdfDocument, setPdfDocument] = useState<pdfjs.PDFDocumentProxy | null>(null);
+  const [pdfDocument, setPdfDocument] = useState<pdfjs.PDFDocumentProxy | null>(
+    null
+  );
   const [scale, setScale] = useState(1.5);
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
 
   const [signatures, setSignatures] = useState<SignaturePosition[]>([]);
-  const [activeSignatureId, setActiveSignatureId] = useState<string | null>(null);
-  const [pageDimensions, setPageDimensions] = useState<Map<number, { 
-    width: number, 
-    height: number, 
-    pdfWidth: number, 
-    pdfHeight: number 
-  }>>(new Map());
+  const [activeSignatureId, setActiveSignatureId] = useState<string | null>(
+    null
+  );
+  const [pageDimensions, setPageDimensions] = useState<
+    Map<
+      number,
+      {
+        width: number;
+        height: number;
+        pdfWidth: number;
+        pdfHeight: number;
+      }
+    >
+  >(new Map());
 
   const handlePageClick = (e: React.MouseEvent, pageNumber: number) => {
-    if ((e.target as HTMLElement).closest('button')) return;
-    if (!signatureImage) return;
+    if ((e.target as HTMLElement).closest("button")) return;
+    if (!signatureImage) return; // Don't proceed if there's no signature image
     if (onPageClick) onPageClick(e, pageNumber);
 
     // IMPORTANT: Always use the selectedPage instead of pageNumber parameter
-    // This ensures signatures are placed on the visible page regardless of which page element was clicked
     const actualPageNumber = selectedPage;
-    
+
     const target = e.currentTarget as HTMLElement;
     const rect = target.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
-    
-    // Get the page dimensions for coordinate conversion
+
     const pageDim = pageDimensions.get(actualPageNumber);
-    
     if (!pageDim) return;
-    
+
+    // Ensure signatureImage is actually a string before creating a signature
+    if (typeof signatureImage !== "string" || !signatureImage.trim()) {
+      console.error("Cannot create signature: Invalid signature image");
+      return;
+    }
+
     const newSignature: SignaturePosition = {
       id: `sig_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       pageNumber: actualPageNumber,
@@ -74,17 +92,21 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
       pageHeight: pageDim.height,
       pdfWidth: pageDim.pdfWidth,
       pdfHeight: pageDim.pdfHeight,
+      signatureImageUrl: signatureImage,
     };
-    
-    setSignatures(prev => [...prev, newSignature]);
+
+    setSignatures((prev) => [...prev, newSignature]);
     setActiveSignatureId(newSignature.id);
   };
 
   // Function to update signatures - passed to DraggableSignature component
-  const updateSignatures = useCallback((updatedSignatures: SignaturePosition[]) => {
-    setSignatures(updatedSignatures);
-  }, []);
-  
+  const updateSignatures = useCallback(
+    (updatedSignatures: SignaturePosition[]) => {
+      setSignatures(updatedSignatures);
+    },
+    []
+  );
+
   // Add this useEffect to handle parent updates separately
   useEffect(() => {
     if (saveSignaturePositions) {
@@ -94,7 +116,7 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
 
   // Function to remove a signature - passed to DraggableSignature component
   const removeSignature = (id: string) => {
-    setSignatures(prev => prev.filter(sig => sig.id !== id));
+    setSignatures((prev) => prev.filter((sig) => sig.id !== id));
     if (activeSignatureId === id) {
       setActiveSignatureId(null);
     }
@@ -138,8 +160,8 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
     setScale((s) => Math.max(s - 0.2, 0.5));
   };
 
-  return  (
-    <div className={`pdf-viewer ${className || ''}`}>
+  return (
+    <div className={`pdf-viewer ${className || ""}`}>
       <div className="flex flex-col md:flex-row h-full">
         {/* Sidebar */}
         <div className="md:w-1/5 md:min-w-[180px] border-r border-gray-200 overflow-auto">
@@ -150,7 +172,7 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
             numPages={numPages}
           />
         </div>
-        
+
         {/* Main PDF View */}
         <div className="flex-1 overflow-auto" ref={containerRef}>
           <div className="sticky top-0 z-20 bg-white p-2 border-b flex justify-between items-center">
@@ -177,7 +199,7 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
               </button>
             </div>
           </div>
-          
+
           {/* Only render the current visible page for better performance */}
           <div className="p-4">
             {pdfDocument && (

@@ -12,7 +12,7 @@ import { SignaturePosition } from "@/app/types/signaturePosition";
 
 interface DraggableSignatureProps {
   signature: SignaturePosition;
-  signatureImage: string;
+  signatureImage: string | null;
   activeSignatureId: string | null;
   setActiveSignatureId: (id: string) => void;
   pageDimensions: Map<
@@ -237,10 +237,10 @@ const DraggableSignature: React.FC<DraggableSignatureProps> = ({
         onMouseDown={handleMouseDown}
       >
         <img
-          src={signature.signatureImageUrl || signatureImage} // Use signature's own image if available
+          src={signature.signatureImageUrl || ""} // Only use the signature's own URL
           alt="Signature"
-          className="w-full h-full object-contain"
-          draggable={false}
+          className="w-full h-full object-contain pointer-events-none"
+          style={{ maxWidth: "100%", maxHeight: "100%" }}
         />
 
         {/* Delete button */}
@@ -278,10 +278,10 @@ const DraggableSignature: React.FC<DraggableSignatureProps> = ({
       size,
       activeSignatureId,
       signature.id,
+      signature.signatureImageUrl,
       handleMouseDown,
       handleResizeStart,
       removeSignature,
-      signatureImage,
     ]
   );
 };

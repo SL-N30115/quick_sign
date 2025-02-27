@@ -124,26 +124,35 @@ export default function Sign() {
   };
 
   const handleFinalize = async () => {
-    if (!pdfBlob || !signatureImage || signatures.length === 0) {
+    if (!pdfBlob || signatures.length === 0) {
       setError("Please add your signature to the document before finalizing.");
       return;
     }
 
     try {
-      const formData = new FormData();
-      formData.append("pdfFile", pdfBlob);
-
       // Create the properly formatted signature objects
-      const formattedSignatures = signatures.map((sig) => ({
-        signatureImage,
-        page: sig.pageNumber,
-        position: { x: sig.x, y: sig.y },
-        size: { width: sig.width, height: sig.height },
-        pageWidth: sig.pageWidth,
-        pageHeight: sig.pageHeight,
-        pdfWidth: sig.pdfWidth,
-        pdfHeight: sig.pdfHeight,
-      }));
+      const formattedSignatures = signatures.map((sig) => {
+        // Extract the base64 data if needed - some browsers may include a data URL prefix
+        let signatureData = sig.signatureImageUrl;
+
+        // Ensure we have the full data URL format for the server
+        if (!signatureData.startsWith("data:image/")) {
+          signatureData = `data:image/png;base64,${signatureData}`;
+        }
+
+        return {
+          signatureImage: signatureData, // Use each signature's own image URL
+          page: sig.pageNumber,
+          position: { x: sig.x, y: sig.y },
+          size: { width: sig.width, height: sig.height },
+          pageWidth: sig.pageWidth || 800, // Provide default value if undefined
+          pageHeight: sig.pageHeight || 1100, // Provide default value if undefined
+          pdfWidth: sig.pdfWidth || 612, // Provide default value if undefined
+          pdfHeight: sig.pdfHeight || 792, // Provide default value if undefined
+        };
+      });
+
+      console.log("Sending signatures to backend:", formattedSignatures);
 
       // If we're in development mode with a sample PDF, show demo alert instead
       if (apiWarning) {
@@ -221,15 +230,18 @@ export default function Sign() {
       pageHeight: pageDim.height,
       pdfWidth: pageDim.pdfWidth,
       pdfHeight: pageDim.pdfHeight,
+      signatureImageUrl: signatureDataUrl, // Store the specific signature image
     };
 
-    // Add to signatures collection
-    setSignatures((prev) => [...prev, newSignature]);
-
-    // If we have a saveSignaturePositions prop, call it
-    if (saveSignaturePositions) {
-      saveSignaturePositions([...signatures, newSignature]);
-    }
+    // Use the function form of setState to avoid race conditions with the previous state
+    setSignatures((prevSignatures) => {
+      const newSignatures = [...prevSignatures, newSignature];
+      // If we have a saveSignaturePositions prop, call it with the new array
+      if (saveSignaturePositions) {
+        saveSignaturePositions(newSignatures);
+      }
+      return newSignatures;
+    });
   };
 
   const handleDeleteSignature = (index: number) => {
