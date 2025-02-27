@@ -38,6 +38,19 @@ export default function Sign() {
     useState<boolean>(false);
   const [isSignatureModalOpen, setIsSignatureModalOpen] =
     useState<boolean>(false);
+  const [pdfPageDimensions, setPdfPageDimensions] = useState<
+    Map<
+      number,
+      {
+        width: number;
+        height: number;
+        pdfWidth: number;
+        pdfHeight: number;
+      }
+    >
+  >(new Map());
+
+  const pdfViewerRef = useRef<any>(null);
 
   useEffect(() => {
     try {
@@ -191,9 +204,13 @@ export default function Sign() {
   };
 
   const getPageDimensions = () => {
-    // This is a simplified version - in a real app, you'd access the PDFViewer's pageDimensions state
-    // You might need to refactor to have access to that data, or pass a method from PDFViewer
-    // For now, we'll use placeholder values
+    // Try to get dimensions from the stored page dimensions map
+    const pageDim = pdfPageDimensions.get(selectedPage);
+    if (pageDim) {
+      return pageDim;
+    }
+
+    // Fallback to default dimensions
     return {
       width: 800,
       height: 1100,
@@ -203,22 +220,31 @@ export default function Sign() {
   };
 
   const saveSignaturePositions = (positions: SignaturePosition[]) => {
-    setSignatures(positions);
-    console.log("Updated signatures:", positions);
+    // Only update the signatures state if it actually changed
+    if (JSON.stringify(signatures) !== JSON.stringify(positions)) {
+      setSignatures(positions);
+      console.log("Updated signatures:", positions);
+    }
   };
 
   const handleAddSignatureToDocument = (signatureDataUrl: string) => {
-    setSignatureImage(signatureDataUrl); // Set as active signature
-
-    // Get the page dimensions for proper placement
+    console.log("Adding signature to document:", signatureDataUrl.substring(0, 50) + "...");
+    
+    // Set as active signature (for new signatures)
+    setSignatureImage(signatureDataUrl);
+    
+    // Get page dimensions
     const pageDim = getPageDimensions();
-    if (!pageDim) return;
-
+    if (!pageDim) {
+      console.error("No page dimensions available");
+      return;
+    }
+    
     // Calculate center position
-    const centerX = pageDim.width / 2 - 75; // Half of default width (150px)
-    const centerY = pageDim.height / 2 - 40; // Half of default height (80px)
-
-    // Create new signature at center of current page
+    const centerX = pageDim.width / 2 - 75;
+    const centerY = pageDim.height / 2 - 40;
+    
+    // Create new signature
     const newSignature: SignaturePosition = {
       id: `sig_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       pageNumber: selectedPage,
@@ -230,18 +256,13 @@ export default function Sign() {
       pageHeight: pageDim.height,
       pdfWidth: pageDim.pdfWidth,
       pdfHeight: pageDim.pdfHeight,
-      signatureImageUrl: signatureDataUrl, // Store the specific signature image
+      signatureImageUrl: signatureDataUrl,
     };
-
-    // Use the function form of setState to avoid race conditions with the previous state
-    setSignatures((prevSignatures) => {
-      const newSignatures = [...prevSignatures, newSignature];
-      // If we have a saveSignaturePositions prop, call it with the new array
-      if (saveSignaturePositions) {
-        saveSignaturePositions(newSignatures);
-      }
-      return newSignatures;
-    });
+    
+    console.log("Created signature:", newSignature);
+    
+    // Update signatures state - IMPORTANT: No setTimeout here, it can cause race conditions
+    setSignatures(prevSignatures => [...prevSignatures, newSignature]);
   };
 
   const handleDeleteSignature = (index: number) => {
@@ -278,7 +299,9 @@ export default function Sign() {
         selectedPage={selectedPage}
         onPageChange={setSelectedPage}
         signatureImage={signatureImage}
-        saveSignaturePositions={saveSignaturePositions}
+        signatures={signatures} // Pass signatures
+        setSignatures={setSignatures} // Pass setter
+        onPageDimensionsChange={setPdfPageDimensions}
       />
 
       {/* Signature Modal */}
