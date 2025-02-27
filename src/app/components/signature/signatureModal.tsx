@@ -7,8 +7,8 @@ import SignaturePad from "signature_pad";
 interface SignatureModalProps {
   isOpen: boolean;
   onClose: () => void;
-  signaturePadRef: React.RefObject<SignaturePad>;
-  canvasRef: React.RefObject<HTMLCanvasElement>;
+  signaturePadRef: React.RefObject<SignaturePad | null>;  // Updated to accept null
+  canvasRef: React.RefObject<HTMLCanvasElement | null>;   // Updated to accept null
   onSignatureSave: (signatureDataUrl: string) => void;
   onClear: () => void;
 }
