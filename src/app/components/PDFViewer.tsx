@@ -45,6 +45,7 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
   }>>(new Map());
 
   const handlePageClick = (e: React.MouseEvent, pageNumber: number) => {
+    if ((e.target as HTMLElement).closest('button')) return;
     if (!signatureImage) return;
     if (onPageClick) onPageClick(e, pageNumber);
 
