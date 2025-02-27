@@ -5,7 +5,8 @@ import { pdfjs } from "react-pdf";
 import React, { useRef, useState, useEffect } from "react";
 import SignaturePad from "signature_pad";
 import PDFViewer from "@/app/components/PDFViewer";
-import SignatureArea from "@/app/components/signatureArea";
+import SignatureToolbar from "@/app/components/signature/signatureToolbar";
+import SignatureModal from "@/app/components/signature/signatureModal";
 import { SignaturePosition } from "@/app/types/signaturePosition";
 
 const CONFIG = {
@@ -31,11 +32,12 @@ export default function Sign() {
   const signaturePadRef = useRef<SignaturePad | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [isProcessingSignature, setIsProcessingSignature] = useState<boolean>(false);
+  const [isSignatureModalOpen, setIsSignatureModalOpen] = useState<boolean>(false);
 
   // Use the same structure as expected by PDFViewer
   const [signatures, setSignatures] = useState<SignaturePosition[]>([]);
 
-  // Handle signature save from SignatureArea component
+  // Handle signature save from SignatureModal component
   const handleSignatureSave = async (signatureDataUrl: string) => {
     setIsProcessingSignature(true);
     setSignatureImage(signatureDataUrl);
@@ -160,55 +162,30 @@ export default function Sign() {
         </div>
       )}
 
-      <div className="flex flex-col md:flex-row gap-4">
-        {/* PDF Viewer Column - takes 2/3 of the space */}
-        <div className="md:w-2/3">
-          <PDFViewer
-            pdfBlob={pdfBlob}
-            selectedPage={selectedPage}
-            onPageChange={setSelectedPage}
-            signatureImage={signatureImage}
-            saveSignaturePositions={saveSignaturePositions}
-          />
-        </div>
+      <SignatureToolbar
+        onSignButtonClick={() => setIsSignatureModalOpen(true)}
+        signatureImage={signatureImage}
+        handleFinalize={handleFinalize}
+        signaturesCount={signatures.length}
+      />
 
-        {/* Signature Tools Column - takes 1/3 of the space */}
-        <div className="md:w-1/3 bg-white p-4 shadow rounded-lg">
-          <h2 className="text-xl font-semibold mb-4">Signature Tools</h2>
+      <PDFViewer
+        pdfBlob={pdfBlob}
+        selectedPage={selectedPage}
+        onPageChange={setSelectedPage}
+        signatureImage={signatureImage}
+        saveSignaturePositions={saveSignaturePositions}
+      />
 
-          <SignatureArea
-            signaturePadRef={signaturePadRef}
-            canvasRef={canvasRef}
-            onSignatureSave={handleSignatureSave}
-            onClear={handleClear}
-          />
-
-          {signatureImage && (
-            <div className="mt-4 p-3 bg-gray-50 rounded-lg">
-              <h3 className="font-medium mb-2">Your Signature</h3>
-              <div className="border rounded p-2 flex justify-center">
-                <img
-                  src={signatureImage}
-                  alt="Your signature"
-                  className="max-h-24"
-                />
-              </div>
-              <div className="mt-4">
-                <p className="text-sm text-gray-600 mb-2">
-                  Click on the document to place your signature.
-                </p>
-                <button
-                  onClick={handleFinalize}
-                  className="w-full bg-green-600 text-white py-2 px-4 rounded hover:bg-green-700"
-                  disabled={signatures.length === 0}
-                >
-                  Finalize Document
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
+      {/* Signature Modal */}
+      <SignatureModal
+        isOpen={isSignatureModalOpen}
+        onClose={() => setIsSignatureModalOpen(false)}
+        signaturePadRef={signaturePadRef}
+        canvasRef={canvasRef}
+        onSignatureSave={handleSignatureSave}
+        onClear={handleClear}
+      />
     </div>
   );
 }
