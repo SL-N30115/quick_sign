@@ -22,32 +22,65 @@ pdfjs.GlobalWorkerOptions.workerSrc = new URL(
   import.meta.url
 ).toString();
 
+const SAVED_SIGNATURES_KEY = "quicksign_saved_signatures";
+
 export default function Sign() {
   const { id } = useParams();
   const [selectedPage, setSelectedPage] = useState<number>(1);
   const [signatureImage, setSignatureImage] = useState<string | null>(null);
+  const [savedSignatures, setSavedSignatures] = useState<string[]>([]);
   const [pdfBlob, setPdfBlob] = useState<Blob | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [apiWarning, setApiWarning] = useState<string | null>(null);
   const signaturePadRef = useRef<SignaturePad | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const [isProcessingSignature, setIsProcessingSignature] = useState<boolean>(false);
-  const [isSignatureModalOpen, setIsSignatureModalOpen] = useState<boolean>(false);
+  const [isProcessingSignature, setIsProcessingSignature] =
+    useState<boolean>(false);
+  const [isSignatureModalOpen, setIsSignatureModalOpen] =
+    useState<boolean>(false);
+
+  useEffect(() => {
+    try {
+      const savedData = localStorage.getItem(SAVED_SIGNATURES_KEY);
+      if (savedData) {
+        const parsed = JSON.parse(savedData);
+        if (Array.isArray(parsed)) {
+          setSavedSignatures(parsed);
+        }
+      }
+    } catch (error) {
+      console.error("Error loading saved signatures:", error);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (savedSignatures.length > 0) {
+      try {
+        localStorage.setItem(
+          SAVED_SIGNATURES_KEY,
+          JSON.stringify(savedSignatures)
+        );
+      } catch (error) {
+        console.error("Error saving signatures:", error);
+      }
+    }
+  }, [savedSignatures]);
 
   // Use the same structure as expected by PDFViewer
   const [signatures, setSignatures] = useState<SignaturePosition[]>([]);
 
   // Handle signature save from SignatureModal component
-  const handleSignatureSave = async (signatureDataUrl: string) => {
+  const handleSignatureSave = (signatureDataUrl: string) => {
     setIsProcessingSignature(true);
+
+    // Add to saved signatures if it's not already there
+    if (!savedSignatures.includes(signatureDataUrl)) {
+      setSavedSignatures((prev) => [...prev, signatureDataUrl]);
+    }
+
+    // Set as active signature
     setSignatureImage(signatureDataUrl);
     setIsProcessingSignature(false);
-  };
-
-  // Save signature positions from PDFViewer
-  const saveSignaturePositions = (positions: SignaturePosition[]) => {
-    setSignatures(positions);
-    console.log("Updated signatures:", positions);
   };
 
   useEffect(() => {
@@ -95,13 +128,13 @@ export default function Sign() {
       setError("Please add your signature to the document before finalizing.");
       return;
     }
-  
+
     try {
       const formData = new FormData();
       formData.append("pdfFile", pdfBlob);
-      
+
       // Create the properly formatted signature objects
-      const formattedSignatures = signatures.map(sig => ({
+      const formattedSignatures = signatures.map((sig) => ({
         signatureImage,
         page: sig.pageNumber,
         position: { x: sig.x, y: sig.y },
@@ -109,9 +142,9 @@ export default function Sign() {
         pageWidth: sig.pageWidth,
         pageHeight: sig.pageHeight,
         pdfWidth: sig.pdfWidth,
-        pdfHeight: sig.pdfHeight
+        pdfHeight: sig.pdfHeight,
       }));
-      
+
       // If we're in development mode with a sample PDF, show demo alert instead
       if (apiWarning) {
         alert(
@@ -119,23 +152,23 @@ export default function Sign() {
         );
         return;
       }
-  
+
       // Send data in the format expected by the backend
       const response = await fetch(`${CONFIG.API_BASE_URL}/sign-batch`, {
         method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           documentId: id,
-          signatures: formattedSignatures
-        })
+          signatures: formattedSignatures,
+        }),
       });
-  
+
       if (!response.ok) {
         throw new Error(`Server error: ${response.status}`);
       }
-  
+
       const data = await response.json();
       if (data.signedId) {
         window.location.href = `/download/${data.signedId}`;
@@ -146,6 +179,65 @@ export default function Sign() {
       setError("Failed to finalize document. Please try again.");
       console.error("Error finalizing signature:", error);
     }
+  };
+
+  const getPageDimensions = () => {
+    // This is a simplified version - in a real app, you'd access the PDFViewer's pageDimensions state
+    // You might need to refactor to have access to that data, or pass a method from PDFViewer
+    // For now, we'll use placeholder values
+    return {
+      width: 800,
+      height: 1100,
+      pdfWidth: 612,
+      pdfHeight: 792,
+    };
+  };
+
+  const saveSignaturePositions = (positions: SignaturePosition[]) => {
+    setSignatures(positions);
+    console.log("Updated signatures:", positions);
+  };
+
+  const handleAddSignatureToDocument = (signatureDataUrl: string) => {
+    setSignatureImage(signatureDataUrl); // Set as active signature
+
+    // Get the page dimensions for proper placement
+    const pageDim = getPageDimensions();
+    if (!pageDim) return;
+
+    // Calculate center position
+    const centerX = pageDim.width / 2 - 75; // Half of default width (150px)
+    const centerY = pageDim.height / 2 - 40; // Half of default height (80px)
+
+    // Create new signature at center of current page
+    const newSignature: SignaturePosition = {
+      id: `sig_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      pageNumber: selectedPage,
+      x: centerX,
+      y: centerY,
+      width: 150,
+      height: 80,
+      pageWidth: pageDim.width,
+      pageHeight: pageDim.height,
+      pdfWidth: pageDim.pdfWidth,
+      pdfHeight: pageDim.pdfHeight,
+    };
+
+    // Add to signatures collection
+    setSignatures((prev) => [...prev, newSignature]);
+
+    // If we have a saveSignaturePositions prop, call it
+    if (saveSignaturePositions) {
+      saveSignaturePositions([...signatures, newSignature]);
+    }
+  };
+
+  const handleDeleteSignature = (index: number) => {
+    setSavedSignatures((prev) => {
+      const updated = [...prev];
+      updated.splice(index, 1);
+      return updated;
+    });
   };
 
   if (error) return <div className="text-red-500">{error}</div>;
@@ -178,6 +270,7 @@ export default function Sign() {
       />
 
       {/* Signature Modal */}
+      {/* Updated Signature Modal */}
       <SignatureModal
         isOpen={isSignatureModalOpen}
         onClose={() => setIsSignatureModalOpen(false)}
@@ -185,6 +278,9 @@ export default function Sign() {
         canvasRef={canvasRef}
         onSignatureSave={handleSignatureSave}
         onClear={handleClear}
+        savedSignatures={savedSignatures}
+        onDeleteSignature={handleDeleteSignature}
+        onAddToDocument={handleAddSignatureToDocument}
       />
     </div>
   );

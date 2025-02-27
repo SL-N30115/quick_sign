@@ -237,7 +237,7 @@ const DraggableSignature: React.FC<DraggableSignatureProps> = ({
         onMouseDown={handleMouseDown}
       >
         <img
-          src={signatureImage}
+          src={signature.signatureImageUrl || signatureImage} // Use signature's own image if available
           alt="Signature"
           className="w-full h-full object-contain"
           draggable={false}
