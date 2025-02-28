@@ -27,7 +27,6 @@ interface DraggableSignatureProps {
   updateSignatures: (updatedSignatures: SignaturePosition[]) => void;
   allSignatures: SignaturePosition[];
   removeSignature: (id: string) => void;
-  scale: number; 
 }
 
 const DraggableSignature: React.FC<DraggableSignatureProps> = ({
@@ -39,7 +38,6 @@ const DraggableSignature: React.FC<DraggableSignatureProps> = ({
   updateSignatures,
   allSignatures,
   removeSignature,
-  scale
 }) => {
   // Use refs to track position and size during drag/resize operations
   // without causing re-renders
@@ -72,13 +70,7 @@ const DraggableSignature: React.FC<DraggableSignatureProps> = ({
       // Get current page dimensions
       const dimensions = pageDimensions.get(signature.pageNumber);
       if (!dimensions) return; // Don't update if dimensions aren't available
-  
-      // Calculate the scale-independent coordinates
-      const scaleIndependentX = positionRef.current.x / scale;
-      const scaleIndependentY = positionRef.current.y / scale;
-      const scaleIndependentWidth = sizeRef.current.width / scale;
-      const scaleIndependentHeight = sizeRef.current.height / scale;
-  
+
       // Create a new array only if there's an actual change
       const updatedSignatures = allSignatures.map((sig) =>
         sig.id === signature.id
@@ -88,20 +80,14 @@ const DraggableSignature: React.FC<DraggableSignatureProps> = ({
               y: positionRef.current.y,
               width: sizeRef.current.width,
               height: sizeRef.current.height,
-              // Store scale-independent values for backend use
-              normalizedX: scaleIndependentX,
-              normalizedY: scaleIndependentY,
-              normalizedWidth: scaleIndependentWidth,
-              normalizedHeight: scaleIndependentHeight,
               pageWidth: dimensions.width,
               pageHeight: dimensions.height,
               pdfWidth: dimensions.pdfWidth,
               pdfHeight: dimensions.pdfHeight,
-              scale: scale, // Store current scale
             }
           : sig
       );
-  
+
       updateSignatures(updatedSignatures);
     }, 100),
     [
@@ -110,7 +96,6 @@ const DraggableSignature: React.FC<DraggableSignatureProps> = ({
       pageDimensions,
       allSignatures,
       updateSignatures,
-      scale, // Add scale as a dependency
     ]
   );
 
