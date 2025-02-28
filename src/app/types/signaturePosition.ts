@@ -9,6 +9,7 @@ export interface SignaturePosition {
     pageHeight?: number; // Height of the page as rendered in browser
     pdfWidth?: number;   // Original width of PDF page
     pdfHeight?: number;  // Original height of PDF page
+    signatureImageUrl: string;
     // New fields to improve accuracy with canvas rendering
     canvasX?: number;    // X coordinate relative to canvas
     canvasY?: number;    // Y coordinate relative to canvas
