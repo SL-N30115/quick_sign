@@ -27,7 +27,6 @@ interface DraggableSignatureProps {
   updateSignatures: (updatedSignatures: SignaturePosition[]) => void;
   allSignatures: SignaturePosition[];
   removeSignature: (id: string) => void;
-  scale: number; // Add this new prop
 }
 
 const DraggableSignature: React.FC<DraggableSignatureProps> = ({
@@ -39,7 +38,6 @@ const DraggableSignature: React.FC<DraggableSignatureProps> = ({
   updateSignatures,
   allSignatures,
   removeSignature,
-  scale,
 }) => {
   // Use refs to track position and size during drag/resize operations
   // without causing re-renders
@@ -73,22 +71,17 @@ const DraggableSignature: React.FC<DraggableSignatureProps> = ({
       const dimensions = pageDimensions.get(signature.pageNumber);
       if (!dimensions) return; // Don't update if dimensions aren't available
 
-      // Get the current scale level from wherever it's stored in your app
-      // This is the important addition - we need to account for the current view scale
-      const currentScale = 1.5; // Replace with your actual scale state variable, e.g. from PDFViewer component
-
       // Create a new array only if there's an actual change
       const updatedSignatures = allSignatures.map((sig) =>
         sig.id === signature.id
           ? {
               ...sig,
-              // Normalize coordinates by dividing by currentScale
-              x: positionRef.current.x / currentScale,
-              y: positionRef.current.y / currentScale,
-              width: sizeRef.current.width / currentScale,
-              height: sizeRef.current.height / currentScale,
-              pageWidth: dimensions.width / currentScale,
-              pageHeight: dimensions.height / currentScale,
+              x: positionRef.current.x,
+              y: positionRef.current.y,
+              width: sizeRef.current.width,
+              height: sizeRef.current.height,
+              pageWidth: dimensions.width,
+              pageHeight: dimensions.height,
               pdfWidth: dimensions.pdfWidth,
               pdfHeight: dimensions.pdfHeight,
             }
