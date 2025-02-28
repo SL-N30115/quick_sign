@@ -145,23 +145,29 @@ export default function Sign() {
     try {
       // Create the properly formatted signature objects
       const formattedSignatures = signatures.map((sig) => {
-        // Extract the base64 data if needed - some browsers may include a data URL prefix
+        // Extract the base64 data if needed
         let signatureData = sig.signatureImageUrl;
-
+      
         // Ensure we have the full data URL format for the server
         if (!signatureData.startsWith("data:image/")) {
           signatureData = `data:image/png;base64,${signatureData}`;
         }
-
+      
+        // Use normalized coordinates if available, otherwise calculate from current values
+        const x = sig.normalizedX !== undefined ? sig.normalizedX : sig.x / (sig.scale || 1);
+        const y = sig.normalizedY !== undefined ? sig.normalizedY : sig.y / (sig.scale || 1);
+        const width = sig.normalizedWidth !== undefined ? sig.normalizedWidth : sig.width / (sig.scale || 1);
+        const height = sig.normalizedHeight !== undefined ? sig.normalizedHeight : sig.height / (sig.scale || 1);
+      
         return {
-          signatureImage: signatureData, // Use each signature's own image URL
+          signatureImage: signatureData,
           page: sig.pageNumber,
-          position: { x: sig.x, y: sig.y },
-          size: { width: sig.width, height: sig.height },
-          pageWidth: sig.pageWidth || 800, // Provide default value if undefined
-          pageHeight: sig.pageHeight || 1100, // Provide default value if undefined
-          pdfWidth: sig.pdfWidth || 612, // Provide default value if undefined
-          pdfHeight: sig.pdfHeight || 792, // Provide default value if undefined
+          position: { x, y }, // Use normalized coordinates
+          size: { width, height }, // Use normalized size
+          pageWidth: sig.pageWidth || 800,
+          pageHeight: sig.pageHeight || 1100,
+          pdfWidth: sig.pdfWidth || 612,
+          pdfHeight: sig.pdfHeight || 792,
         };
       });
 

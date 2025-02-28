@@ -230,6 +230,7 @@ const PDFPageCanvas: React.FC<PDFPageCanvasProps> = ({
                 updateSignatures={updateSignatures}
                 allSignatures={signatures}
                 removeSignature={removeSignature}
+                scale={scale}
               />
             ))}
       </div>
