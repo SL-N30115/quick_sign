@@ -32,6 +32,7 @@ interface PDFViewerProps {
         height: number;
         pdfWidth: number;
         pdfHeight: number;
+        scale?: number;
       }
     >
   ) => void;
@@ -65,6 +66,7 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
         height: number;
         pdfWidth: number;
         pdfHeight: number;
+        scale?: number;
       }
     >
   >(new Map());
@@ -107,6 +109,24 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
       (window as any).addSignatureToPDF = addSignature;
     }
   }, [addSignature]);
+
+    // Add this to PDFViewer where you update pageDimensions
+  useEffect(() => {
+      // When scale changes, update the pageDimensions with the new scale
+      setPageDimensions(prevDimensions => {
+          const newDimensions = new Map(prevDimensions);
+          
+          // Update each page's dimensions with the current scale
+          prevDimensions.forEach((dim, pageNum) => {
+              newDimensions.set(pageNum, {
+                  ...dim,
+                  scale: scale
+              });
+          });
+          
+          return newDimensions;
+      });
+  }, [scale]);
 
   const handlePageClick = (e: React.MouseEvent, pageNumber: number) => {
     // if ((e.target as HTMLElement).closest("button")) return;
