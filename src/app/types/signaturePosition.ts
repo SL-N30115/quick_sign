@@ -10,7 +10,9 @@ export interface SignaturePosition {
     pdfWidth?: number;   // Original width of PDF page
     pdfHeight?: number;  // Original height of PDF page
     signatureImageUrl: string;
-    // New fields to improve accuracy with canvas rendering
-    canvasX?: number;    // X coordinate relative to canvas
-    canvasY?: number;    // Y coordinate relative to canvas
-  }
+    // New fields for normalized coordinates (at 100% scale)
+    normalizedX?: number;
+    normalizedY?: number;
+    normalizedWidth?: number;
+    normalizedHeight?: number;
+}
