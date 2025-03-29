@@ -1,6 +1,6 @@
 "use client";
 
-import React, {useState, useEffect, useRef} from "react";
+import React, {useState, useEffect, useRef, useCallback} from "react";
 import {pdfjs} from "react-pdf";
 import {SignaturePosition} from "@/app/types/signaturePosition";
 import DraggableSignature from "./DraggableSignature";
@@ -25,7 +25,6 @@ interface PDFPageCanvasProps {
     activeSignatureId: string | null;
     setActiveSignatureId: React.Dispatch<React.SetStateAction<string | null>>;
     isVisible: boolean;
-
 }
 
 const PDFPageCanvas: React.FC<PDFPageCanvasProps> = ({
@@ -49,6 +48,7 @@ const PDFPageCanvas: React.FC<PDFPageCanvasProps> = ({
     const containerRef = useRef<HTMLDivElement>(null);
     const renderTaskRef = useRef<pdfjs.RenderTask | null>(null);
     const isMounted = useRef(true); // Track component mount state
+    const prevSignaturesRef = useRef<SignaturePosition[]>([]);
 
     // Set up mount/unmount tracking
     useEffect(() => {
@@ -57,6 +57,27 @@ const PDFPageCanvas: React.FC<PDFPageCanvasProps> = ({
             isMounted.current = false;
         };
     }, []);
+
+    // Auto-select newly added signatures
+    useEffect(() => {
+        if (signatures.length > prevSignaturesRef.current.length) {
+            // A new signature was added
+            const newSignatures = signatures.filter(
+                sig => !prevSignaturesRef.current.some(prevSig => prevSig.id === sig.id)
+            );
+
+            // If there's a new signature and it belongs to this page, select it
+            if (newSignatures.length > 0) {
+                const newSigForThisPage = newSignatures.find(sig => sig.pageNumber === pageNumber);
+                if (newSigForThisPage) {
+                    setActiveSignatureId(newSigForThisPage.id);
+                }
+            }
+        }
+
+        // Update the ref to current signatures
+        prevSignaturesRef.current = signatures;
+    }, [signatures, pageNumber, setActiveSignatureId]);
 
     // Render the PDF page directly to canvas
     useEffect(() => {
