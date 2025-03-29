@@ -10,11 +10,11 @@ interface PDFSidebarProps {
 }
 
 const PDFSidebar: React.FC<PDFSidebarProps> = ({
-  pdfDocument,
-  currentPage,
-  onPageSelect,
-  numPages,
-}) => {
+                                                 pdfDocument,
+                                                 currentPage,
+                                                 onPageSelect,
+                                                 numPages,
+                                               }) => {
   const [thumbnails, setThumbnails] = useState<Map<number, string>>(new Map());
   const [isLoading, setIsLoading] = useState<Set<number>>(new Set());
   const thumbnailContainerRef = useRef<HTMLDivElement>(null);
@@ -22,9 +22,9 @@ const PDFSidebar: React.FC<PDFSidebarProps> = ({
   // Generate thumbnail for a specific page
   const generateThumbnail = async (pageNumber: number) => {
     if (
-      !pdfDocument ||
-      thumbnails.has(pageNumber) ||
-      isLoading.has(pageNumber)
+        !pdfDocument ||
+        thumbnails.has(pageNumber) ||
+        isLoading.has(pageNumber)
     ) {
       return;
     }
@@ -63,8 +63,8 @@ const PDFSidebar: React.FC<PDFSidebarProps> = ({
       });
     } catch (error) {
       console.error(
-        `Error generating thumbnail for page ${pageNumber}:`,
-        error
+          `Error generating thumbnail for page ${pageNumber}:`,
+          error
       );
     } finally {
       setIsLoading((prev) => {
@@ -93,7 +93,7 @@ const PDFSidebar: React.FC<PDFSidebarProps> = ({
   useEffect(() => {
     if (thumbnailContainerRef.current) {
       const currentPageElement = thumbnailContainerRef.current.querySelector(
-        `[data-page-number="${currentPage}"]`
+          `[data-page-number="${currentPage}"]`
       );
 
       if (currentPageElement) {
@@ -116,9 +116,9 @@ const PDFSidebar: React.FC<PDFSidebarProps> = ({
       // Generate a few pages before and after current page
       const pagesToGenerate = [];
       for (
-        let i = Math.max(1, currentPage - 2);
-        i <= Math.min(numPages, currentPage + 2);
-        i++
+          let i = Math.max(1, currentPage - 2);
+          i <= Math.min(numPages, currentPage + 2);
+          i++
       ) {
         pagesToGenerate.push(i);
       }
@@ -134,72 +134,79 @@ const PDFSidebar: React.FC<PDFSidebarProps> = ({
   }, [pdfDocument, currentPage, numPages]);
 
   return (
-    <div className="bg-gray-100 p-2 flex flex-col h-full">
-      <div className="flex justify-between mb-4">
-        <button
-          onClick={handlePrevPage}
-          disabled={currentPage <= 1}
-          className={`px-3 py-1 rounded ${
-            currentPage <= 1
-              ? "bg-gray-300 cursor-not-allowed"
-              : "bg-blue-500 hover:bg-blue-600 text-white"
-          }`}
-        >
-          Prev
-        </button>
-        <span className="font-medium">
+      <div className="bg-gray-100 p-2 flex flex-col h-full max-h-[calc(100vh-4rem)]">
+        <div className="flex justify-between mb-4">
+          <button
+              onClick={handlePrevPage}
+              disabled={currentPage <= 1}
+              className={`px-3 py-1 rounded ${
+                  currentPage <= 1
+                      ? "bg-gray-300 cursor-not-allowed"
+                      : "bg-blue-500 hover:bg-blue-600 text-white"
+              }`}
+          >
+            Prev
+          </button>
+          <span className="font-medium">
           {currentPage} / {numPages}
         </span>
-        <button
-          onClick={handleNextPage}
-          disabled={currentPage >= numPages}
-          className={`px-3 py-1 rounded ${
-            currentPage >= numPages
-              ? "bg-gray-300 cursor-not-allowed"
-              : "bg-blue-500 hover:bg-blue-600 text-white"
-          }`}
-        >
-          Next
-        </button>
-      </div>
-
-      <div
-        ref={thumbnailContainerRef}
-        className="overflow-auto flex-1 space-y-2 scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-100"
-      >
-        {Array.from({ length: numPages }, (_, i) => i + 1).map((pageNum) => (
-          <div
-            key={pageNum}
-            data-page-number={pageNum}
-            className={`cursor-pointer p-1 rounded transition-all ${
-              pageNum === currentPage
-                ? "ring-2 ring-blue-500 bg-blue-50"
-                : "hover:bg-gray-200"
-            }`}
-            onClick={() => onPageSelect(pageNum)}
+          <button
+              onClick={handleNextPage}
+              disabled={currentPage >= numPages}
+              className={`px-3 py-1 rounded ${
+                  currentPage >= numPages
+                      ? "bg-gray-300 cursor-not-allowed"
+                      : "bg-blue-500 hover:bg-blue-600 text-white"
+              }`}
           >
-            <div className="text-center text-xs mb-1 font-medium">
-              Page {pageNum}
-            </div>
-            {thumbnails.has(pageNum) ? (
-              <img
-                src={thumbnails.get(pageNum)}
-                alt={`Page ${pageNum} thumbnail`}
-                className="w-full object-contain bg-white shadow"
-              />
-            ) : (
-              <div className="w-full h-24 bg-gray-200 animate-pulse flex items-center justify-center">
-                {isLoading.has(pageNum) ? (
-                  <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+            Next
+          </button>
+        </div>
+
+        <div
+            ref={thumbnailContainerRef}
+            className="overflow-y-auto flex-1 space-y-2 scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-100"
+            style={{
+              maxHeight: "calc(100% - 3rem)",
+              overflowY: "auto"
+            }}
+        >
+          {Array.from({ length: numPages }, (_, i) => i + 1).map((pageNum) => (
+              <div
+                  key={pageNum}
+                  data-page-number={pageNum}
+                  className={`cursor-pointer p-1 rounded transition-all ${
+                      pageNum === currentPage
+                          ? "ring-2 ring-blue-500 bg-blue-50"
+                          : "hover:bg-gray-200"
+                  }`}
+                  onClick={() => onPageSelect(pageNum)}
+              >
+                <div className="text-center text-xs mb-1 font-medium">
+                  Page {pageNum}
+                </div>
+                {thumbnails.has(pageNum) ? (
+                    <img
+                        src={thumbnails.get(pageNum)}
+                        alt={`Page ${pageNum} thumbnail`}
+                        className="w-full object-contain bg-white shadow"
+                    />
                 ) : (
-                  <span className="text-gray-500 text-xs">Loading...</span>
+                    <div className="w-full h-24 bg-gray-200 animate-pulse flex items-center justify-center">
+                      {isLoading.has(pageNum) ? (
+                          <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                      ) : (
+                          <span className="text-gray-500 text-xs">Loading...</span>
+                      )}
+                    </div>
                 )}
+                <div className="text-center text-xs mt-1 font-medium text-gray-500">
+                  Page {pageNum}
+                </div>
               </div>
-            )}
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
-    </div>
   );
 };
 
